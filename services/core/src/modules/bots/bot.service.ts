@@ -1,5 +1,5 @@
-import { HttpService, Injectable } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { HttpService, Injectable, Logger } from '@nestjs/common';
+import { Cron, Interval } from '@nestjs/schedule';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 
@@ -17,14 +17,14 @@ import { BotEventListerTypes } from 'src/omatech-package/types';
 import { CoinsService } from './coin.service';
 import { ETHGateway } from '../blockchain/eth.gateway';
 
-var zmq = require('zeromq');
-var bitcoin = require('bitcoinjs-lib');
-const Socket = require('blockchain.info/Socket');
-const EventEmitter = require('events');
+// var zmq = require('zeromq');
+// var bitcoin = require('bitcoinjs-lib');
+// const Socket = require('blockchain.info/Socket');
+// const EventEmitter = require('events');
 
 const messages = {
-  'BIG_PRICE_CHANGE_PERCENT': 'Big price fluctuations signal',
-  'SHAKR_PUMP_DUMP': 'Shark Pump/Dump price signal',
+  BIG_PRICE_CHANGE_PERCENT: 'Big price fluctuations signal',
+  SHAKR_PUMP_DUMP: 'Shark Pump/Dump price signal',
 };
 
 const coinsList = ['BTC', 'ETH', 'DOGE'];
@@ -34,9 +34,14 @@ const AlertValue = 1000000;
 
 @Injectable()
 export class BotsService {
-  // telegramToken = '1867601575:AAF8ng5DUa0MEeTB7ATZdqQUSvIcdeYv9sM';
-  telegramBot = undefined;
+  telegramToken = '1939599714:AAFubH5LTiPGeZw6Bzvnbeazkw30-CI3Oeo';
+  telegramBot = null;
   prices = [];
+  chatGroupID: -587298976;
+  chatPrivateTestID: 1043619064;
+
+  private readonly logger = new Logger(BotsService.name);
+
   constructor(
     @InjectModel(Follower.name) private readonly followerModel: Model<Follower>,
     private readonly holderSerivce: HolderService,
@@ -45,7 +50,8 @@ export class BotsService {
     private readonly coinService: CoinsService,
     private readonly ethGateway: ETHGateway,
   ) {
-    this.telegramBot = new Telegraf('1939599714:AAFubH5LTiPGeZw6Bzvnbeazkw30-CI3Oeo');
+    this.telegramBot = new Telegraf(this.telegramToken);
+
     this.botSetup();
     this.sharkBTCListner();
     this.sharkETHListner();
@@ -70,10 +76,10 @@ export class BotsService {
     return this.prices[asset] || 0;
   }
 
-  renderAlertIcons(value: number): String {
-    let symbol = value > 10000000 ? '🔥' : '🚨'
+  renderAlertIcons(value: number): string {
+    const symbol = value > 10000000 ? '🔥' : '🚨';
     let message = `${symbol} ${symbol}`;
-    let count = value > 10000000 ? value / 10000000 : value / 10000000;
+    const count = value > 10000000 ? value / 10000000 : value / 10000000;
     if (count > 2) {
       return message + `${symbol} ${symbol}`;
     }
@@ -86,16 +92,32 @@ export class BotsService {
   async sharkBTCListner() {
     const blockChainInfo = new Socket();
     blockChainInfo.onTransaction(async (txObj) => {
-      let txHashObj = this.handleTx(txObj);
+      const txHashObj = this.handleTx(txObj);
       const btcAmount = txHashObj.val * 1e-8;
       const btcUSDValue = this.getPrice('btc') * btcAmount;
-      const senderAddrs = _.map(txHashObj.vin, (item) => item ? Object.keys(item)[0] : '');
-      const receipientAddrs = _.map(txHashObj.vout, (item) => item ? Object.keys(item)[0] : '');
+      const senderAddrs = _.map(txHashObj.vin, (item) =>
+        item ? Object.keys(item)[0] : '',
+      );
+      const receipientAddrs = _.map(txHashObj.vout, (item) =>
+        item ? Object.keys(item)[0] : '',
+      );
       if (btcUSDValue >= 1000000) {
-        const sender = await this.holderSerivce.getByAddresses(senderAddrs, 'btc');
-        const receipient = await this.holderSerivce.getByAddresses(receipientAddrs, 'btc');
+        const sender = await this.holderSerivce.getByAddresses(
+          senderAddrs,
+          'btc',
+        );
+        const receipient = await this.holderSerivce.getByAddresses(
+          receipientAddrs,
+          'btc',
+        );
         // console.log('tx', txHashObj.txid, btcAmount, numeral(btcUSDValue).format('0,0.00'));
-        const message = `${this.renderAlertIcons(btcUSDValue)} ${numeral(btcAmount).format('0,0.00')} #BTC ($${numeral(btcUSDValue).format('0,0.00')}) transferred from #${_.get(sender, 'alias') || 'unknown wallet'} to #${_.get(receipient, 'alias') || 'unknown wallet'}`;
+        const message = `${this.renderAlertIcons(btcUSDValue)} ${numeral(
+          btcAmount,
+        ).format('0,0.00')} #BTC ($${numeral(btcUSDValue).format(
+          '0,0.00',
+        )}) transferred from #${
+          _.get(sender, 'alias') || 'unknown wallet'
+        } to #${_.get(receipient, 'alias') || 'unknown wallet'}`;
         this.sendMessageToFollower(message, ['SHAKR_PUMP_DUMP']);
       }
     });
@@ -106,61 +128,74 @@ export class BotsService {
       const { fromAddress, toAddress, asset, amount } = txObj;
       const usdValue = this.getPrice(asset.toLowerCase()) * amount;
       if (usdValue >= 1000000) {
-        const sender = await this.holderSerivce.getByAddresses(fromAddress, asset.toLowerCase());
-        const receipient = await this.holderSerivce.getByAddresses(toAddress, asset.toLowerCase());
-        const message = `${this.renderAlertIcons(usdValue)}  ${numeral(amount).format('0,0.00')} #${asset.toUpperCase()} ($${numeral(usdValue).format('0,0.00')}) transferred from #${_.get(sender, 'alias') || 'unknown wallet'} to #${_.get(receipient, 'alias') || 'unknown wallet'}`;
+        const sender = await this.holderSerivce.getByAddresses(
+          fromAddress,
+          asset.toLowerCase(),
+        );
+        const receipient = await this.holderSerivce.getByAddresses(
+          toAddress,
+          asset.toLowerCase(),
+        );
+        const message = `${this.renderAlertIcons(usdValue)}  ${numeral(
+          amount,
+        ).format('0,0.00')} #${asset.toUpperCase()} ($${numeral(
+          usdValue,
+        ).format('0,0.00')}) transferred from #${
+          _.get(sender, 'alias') || 'unknown wallet'
+        } to #${_.get(receipient, 'alias') || 'unknown wallet'}`;
         this.sendMessageToFollower(message, ['SHAKR_PUMP_DUMP']);
       }
     });
   }
 
   handleTx(txObj) {
-    let inputs = txObj['inputs'];
-    let outputs = txObj['out'];
-    let vin = [];
-    let vout = [];
+    const inputs = txObj['inputs'];
+    const outputs = txObj['out'];
+    const vin = [];
+    const vout = [];
     let inputsAmount = 0;
     let outputAmount = 0;
-    let addressSet = new Set();
+    const addressSet = new Set();
 
-    for (let inputIter in inputs) {
-      let input = inputs[inputIter]['prev_out'];
-      let vinItem = {};
-      let val = input['value'];
-      let addr = input['addr'];
+    for (const inputIter in inputs) {
+      const input = inputs[inputIter]['prev_out'];
+      const vinItem = {};
+      const val = input['value'];
+      const addr = input['addr'];
       vinItem[addr] = val;
       inputsAmount += val;
       vin.push(vinItem);
       addressSet.add(addr);
     }
 
-    for (let outputIter in outputs) {
-      let output = outputs[outputIter];
-      let outItem = {};
-      let val = output['value'];
-      let addr = output['addr'];
+    for (const outputIter in outputs) {
+      const output = outputs[outputIter];
+      const outItem = {};
+      const val = output['value'];
+      const addr = output['addr'];
       outItem[addr] = val;
       outputAmount += val;
       vout.push(outItem);
       addressSet.add(addr);
     }
 
-    let txHashObj = {
-      'txid': txObj['hash'],
-      'txAt': txObj['time'],
-      'vout': vout,
-      'vin': vin,
-      'fee': inputsAmount - outputAmount,
-      'val': outputAmount,
-      'addr': addressSet
+    const txHashObj = {
+      txid: txObj['hash'],
+      txAt: txObj['time'],
+      vout: vout,
+      vin: vin,
+      fee: inputsAmount - outputAmount,
+      val: outputAmount,
+      addr: addressSet,
     };
     return txHashObj;
   }
 
   botSetup() {
-    this.telegramBot.start((ctx) => ctx.reply(
-      `
-      Xin chào, mình là BE !!
+    this.telegramBot.start((ctx) =>
+      ctx.reply(
+        `
+      Xin chào, mình là Bot ngu !!
       Đây là hướng dẫn sử dụng của mình nhé.
       /shark on/off - Bật thông báo tín hiệu cá mập gom hàng, xả hàng
       /PumpDump on/off - Bật thông báo tín hiệu biến động mạnh của thị trường
@@ -168,11 +203,13 @@ export class BotsService {
       /xemgiaETH
       /xemgiaDOGE
       /depth - Xem thống kê volume lệnh bids/asks trên sàn Binance
-    `
-    ));
-    this.telegramBot.help((ctx) => ctx.reply(
-      `
-      Xin chào, mình là BE !!
+    `,
+      ),
+    );
+    this.telegramBot.help((ctx) =>
+      ctx.reply(
+        `
+      Xin chào, mình là Bot ngu !!
       Đây là hướng dẫn sử dụng của mình nhé.
       /shark on/off - Bật thông báo tín hiệu cá mập gom hàng, xả hàng
       /PumpDump on/off - Bật thông báo tín hiệu biến động mạnh của thị trường
@@ -180,16 +217,31 @@ export class BotsService {
       /xemgiaETH
       /xemgiaDOGE
       /depth - Xem thống kê volume lệnh bids/asks trên sàn Binance
-    `
-    ));
+    `,
+      ),
+    );
     this.telegramBot.on('sticker', (ctx) => ctx.reply('👍'));
-    this.telegramBot.hears('hi', (ctx) => ctx.reply(`Xin chào, chúc một ngày tốt lành ${JSON.stringify(ctx.message)}`));
+    this.telegramBot.hears('hi', (ctx) =>
+      ctx.reply(
+        `Xin chào, chúc một ngày tốt lành ${JSON.stringify(ctx.message)}`,
+      ),
+    );
     // Basic command
-    this.telegramBot.command('xemgiaBTC', (ctx) => this.replyCoinPrice(ctx, 'BTC'));
-    this.telegramBot.command('xemgiaETH', (ctx) => this.replyCoinPrice(ctx, 'ETH'));
-    this.telegramBot.command('xemgiaDOGE', (ctx) => this.replyCoinPrice(ctx, 'DOGE'));
-    this.telegramBot.command('PumpDump', (ctx) => this.applyEventListner(ctx, 'BIG_PRICE_CHANGE_PERCENT'));
-    this.telegramBot.command('shark', (ctx) => this.applyEventListner(ctx, 'SHAKR_PUMP_DUMP'));
+    this.telegramBot.command('xemgiaBTC', (ctx) =>
+      this.replyCoinPrice(ctx, 'BTC'),
+    );
+    this.telegramBot.command('xemgiaETH', (ctx) =>
+      this.replyCoinPrice(ctx, 'ETH'),
+    );
+    this.telegramBot.command('xemgiaDOGE', (ctx) =>
+      this.replyCoinPrice(ctx, 'DOGE'),
+    );
+    this.telegramBot.command('PumpDump', (ctx) =>
+      this.applyEventListner(ctx, 'BIG_PRICE_CHANGE_PERCENT'),
+    );
+    this.telegramBot.command('shark', (ctx) =>
+      this.applyEventListner(ctx, 'SHAKR_PUMP_DUMP'),
+    );
 
     this.telegramBot.launch();
   }
@@ -200,10 +252,17 @@ export class BotsService {
    * @param asset
    */
   async replyCoinPrice(ctx: any, asset: string) {
+    this.logger.debug(ctx.message.chat.id);
     asset = asset.toUpperCase();
     const btcPrice = await this.binanceService.priceOf(asset);
-    const priceChangePercent = await this.binanceService.percent24hChangeOf(asset);
-    ctx.reply(`${asset} Prices: $${numeral(btcPrice).format('0,0.00000000')} (${numeral(priceChangePercent).format('0.00')}%)`);
+    const priceChangePercent = await this.binanceService.percent24hChangeOf(
+      asset,
+    );
+    ctx.reply(
+      `${asset} Prices: $${numeral(btcPrice).format('0,0.00000000')} (${numeral(
+        priceChangePercent,
+      ).format('0.00')}%)`,
+    );
   }
 
   /**
@@ -212,11 +271,14 @@ export class BotsService {
    * @param command
    */
   async applyEventListner(ctx: any, command: BotEventListerTypes) {
-    const follower = await this.followerModel.findOne({ isDeleted: false, chatID: ctx.message.chat.id });
+    const follower = await this.followerModel.findOne({
+      isDeleted: false,
+      chatID: ctx.message.chat.id,
+    });
     if (!follower) {
       await this.followerModel.create({
         chatID: ctx.message.chat.id,
-        listenTypes: [command]
+        listenTypes: [command],
       });
       ctx.reply(`Apply ${messages[command]} successfully!.`);
     } else {
@@ -230,17 +292,23 @@ export class BotsService {
     }
   }
 
-  async addFollowerListenTypes(chatID: string, listenType: BotEventListerTypes) {
+  async addFollowerListenTypes(
+    chatID: string,
+    listenType: BotEventListerTypes,
+  ) {
     await this.followerModel.updateOne(
       { chatID },
-      { $push: { listenTypes: listenType } }
+      { $push: { listenTypes: listenType } },
     );
   }
 
-  async removeFollowerListenTypes(chatID: string, listenType: BotEventListerTypes) {
+  async removeFollowerListenTypes(
+    chatID: string,
+    listenType: BotEventListerTypes,
+  ) {
     await this.followerModel.updateOne(
       { chatID },
-      { $pull: { listenTypes: { $in: [listenType] } } }
+      { $pull: { listenTypes: { $in: [listenType] } } },
     );
   }
 
@@ -248,15 +316,25 @@ export class BotsService {
   // Every 15 minute
   async sendSignalBigPriceChange() {
     const prices = await this.binanceService.pricesOf(coinsList);
-    const priceChangePercents = await this.binanceService.percent24hChangeOfCoins(coinsList);
+    const priceChangePercents =
+      await this.binanceService.percent24hChangeOfCoins(coinsList);
     // Only send if change percent get greater than 10%
     let message = '';
     coinsList.map((symbol: any, index: number) => {
-      if (priceChangePercents[symbol] <= -20 || priceChangePercents[symbol] >= 20) {
+      if (
+        priceChangePercents[symbol] <= -20 ||
+        priceChangePercents[symbol] >= 20
+      ) {
         if (message.length <= 0) {
           message = message + `!!! *COIN PRICE ALERT* !!!\n`;
         }
-        message = message + `${symbol} 24h change: ${numeral(prices[symbol]).format('0,0.00000000')} (${priceChangePercents[symbol] > 0 ? '+' : ''}${numeral(priceChangePercents[symbol]).format('0.00')}%)\n`;
+        message =
+          message +
+          `${symbol} 24h change: ${numeral(prices[symbol]).format(
+            '0,0.00000000',
+          )} (${priceChangePercents[symbol] > 0 ? '+' : ''}${numeral(
+            priceChangePercents[symbol],
+          ).format('0.00')}%)\n`;
       }
     });
 
@@ -266,23 +344,50 @@ export class BotsService {
     }
   }
 
-  async sendMessageToFollower(message: string, listenTypes: BotEventListerTypes[]) {
-    const followers = await this.followerModel.find({ isDeleted: false, listenTypes: { $in: listenTypes } });
+  async sendMessageToFollower(
+    message: string,
+    listenTypes: BotEventListerTypes[],
+  ) {
+    const followers = await this.followerModel.find({
+      isDeleted: false,
+      listenTypes: { $in: listenTypes },
+    });
     followers.map(async (follower) => {
       // Dismiss for lister which just receive alert a minute ago
       if (moment().diff(moment(follower.lastestSent), 'minute') >= 1) {
-        this.telegramBot.telegram.sendMessage(follower.chatID, message, { parseMode: "HTML" });
-        this.followerModel.updateOne({ chatID: follower.chatID }, { lastestSent: moment().toDate() }).exec();
+        this.telegramBot.telegram.sendMessage(follower.chatID, message, {
+          parseMode: 'HTML',
+        });
+        this.followerModel
+          .updateOne(
+            { chatID: follower.chatID },
+            { lastestSent: moment().toDate() },
+          )
+          .exec();
       }
     });
   }
 
   @Cron('0 */5 * * * *')
-  // @Interval(60 * 1000)
+  // @Interval(60 * 1000) //Only to test
   // Every 5 minutes
-  async handleCron() {
-    this.holderSerivce.syncETHBalance().then((rs) => this.holderSerivce.syncHolderData(rs));
-    this.holderSerivce.syncBTCBalance().then((rs) => this.holderSerivce.syncHolderData(rs));
-    this.holderSerivce.syncDOGEBalance().then((rs) => this.holderSerivce.syncHolderData(rs));
+  async handleSyncBalanceCronJobs() {
+    this.holderSerivce
+      .syncETHBalance()
+      .then((rs) => this.holderSerivce.syncHolderData(rs));
+    this.holderSerivce
+      .syncBTCBalance()
+      .then((rs) => this.holderSerivce.syncHolderData(rs));
+    this.holderSerivce
+      .syncDOGEBalance()
+      .then((rs) => this.holderSerivce.syncHolderData(rs));
+  }
+
+  // @Cron('0 6 */1 * *') //At 06:00 on every day-of-month.
+  @Interval(10 * 1000) //This one to test
+  async dailyReport() {
+    const message = 'Daily report';
+    this.logger.debug('Daily report');
+    this.telegramBot.telegram.sendMessage(this.chatGroupID, message);
   }
 }

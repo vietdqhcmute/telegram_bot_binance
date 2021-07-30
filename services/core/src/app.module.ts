@@ -1,6 +1,9 @@
 import { HttpModule, Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
+
+import * as mongoosePaginate from 'mongoose-paginate-v2';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -10,6 +13,7 @@ import { HolderModule } from './modules/holders/holder.module';
 @Module({
   imports: [
     HttpModule,
+    ConfigModule.forRoot(),
     HolderModule,
     BotSignalModule,
     ScheduleModule.forRoot(),
@@ -20,7 +24,7 @@ import { HolderModule } from './modules/holders/holder.module';
         uri: 'mongodb://localhost:27017/signalbot',
         // Config pagination for all models
         connectionFactory: (connection) => {
-          connection.plugin(require('mongoose-paginate-v2'));
+          connection.plugin(mongoosePaginate);
           return connection;
         },
       }),
@@ -29,4 +33,4 @@ import { HolderModule } from './modules/holders/holder.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
