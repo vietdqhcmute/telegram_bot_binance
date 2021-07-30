@@ -1,0 +1,21 @@
+{
+  "kind": "collectionType",
+  "collectionName": "exchange_wallets",
+  "info": {
+    "name": "ExchangeWallet"
+  },
+  "options": {
+    "increments": true,
+    "timestamps": true,
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "address": {
+      "type": "string"
+    },
+    "exchangeName": {
+      "type": "string"
+    }
+  }
+}

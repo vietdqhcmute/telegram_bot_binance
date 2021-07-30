@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "holders",
+  "info": {
+    "name": "Holders"
+  },
+  "options": {
+    "increments": true,
+    "timestamps": true,
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "address": {
+      "type": "string"
+    },
+    "balance": {
+      "type": "string"
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "rank": {
+      "type": "integer"
+    },
+    "tokenAddress": {
+      "type": "string"
+    },
+    "alias": {
+      "type": "string"
+    },
+    "share": {
+      "type": "float"
+    },
+    "txCount": {
+      "type": "integer"
+    }
+  }
+}

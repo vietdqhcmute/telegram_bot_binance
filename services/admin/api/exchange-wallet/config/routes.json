@@ -1,0 +1,52 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/exchange-wallets",
+      "handler": "exchange-wallet.find",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/exchange-wallets/count",
+      "handler": "exchange-wallet.count",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/exchange-wallets/:id",
+      "handler": "exchange-wallet.findOne",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exchange-wallets",
+      "handler": "exchange-wallet.create",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/exchange-wallets/:id",
+      "handler": "exchange-wallet.update",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/exchange-wallets/:id",
+      "handler": "exchange-wallet.delete",
+      "config": {
+        "policies": []
+      }
+    }
+  ]
+}
