@@ -366,14 +366,6 @@ export class HolderService {
     return response;
   }
 
-  // @Cron('0 */5 * * * *')
-  // @Interval(60 * 1000)
-  async handleCron() {
-    this.syncETHBalance();
-    this.syncBTCBalance();
-    this.syncDOGEBalance();
-  }
-
   async syncETHBalance(): Promise<HolderBalanceHistoryWithStatistic[]> {
     const holders = await this.ethGateway.topETHHolders(1000);
     await this.balanceHistoryModel.insertMany(holders);
@@ -420,5 +412,13 @@ export class HolderService {
       address: { $in: addresses }
     }).select('address alias');
     return holders;
+  }
+
+  // @Cron('0 */5 * * * *')
+  // @Interval(60 * 1000)
+  async handleCron() {
+    this.syncETHBalance();
+    this.syncBTCBalance();
+    this.syncDOGEBalance();
   }
 }

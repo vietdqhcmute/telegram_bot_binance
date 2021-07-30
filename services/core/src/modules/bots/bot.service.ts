@@ -278,6 +278,7 @@ export class BotsService {
   }
 
   @Cron('0 */5 * * * *')
+  // @Interval(60 * 1000)
   // Every 5 minutes
   async handleCron() {
     this.holderSerivce.syncETHBalance().then((rs) => this.holderSerivce.syncHolderData(rs));
