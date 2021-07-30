@@ -8,6 +8,7 @@ import * as moment from 'moment';
 import * as _ from 'lodash';
 
 import { Telegraf } from 'telegraf';
+import * as Socket from 'blockchain.info/Socket';
 
 import { BinanceService } from '../blockchain/binance.service';
 import { HolderService } from '../holders/holder.service';
@@ -19,7 +20,6 @@ import { ETHGateway } from '../blockchain/eth.gateway';
 
 // var zmq = require('zeromq');
 // var bitcoin = require('bitcoinjs-lib');
-// const Socket = require('blockchain.info/Socket');
 // const EventEmitter = require('events');
 
 const messages = {
@@ -221,19 +221,21 @@ export class BotsService {
       ),
     );
     this.telegramBot.on('sticker', (ctx) => ctx.reply('👍'));
-    this.telegramBot.hears('hi', (ctx) =>
+    this.telegramBot.hears('Hi', (ctx) =>
       ctx.reply(
-        `Xin chào, chúc một ngày tốt lành ${JSON.stringify(ctx.message)}`,
+        `Xin chào, chúc một ngày tốt lành ${JSON.stringify(
+          ctx.message.from.username,
+        )}`,
       ),
     );
     // Basic command
-    this.telegramBot.command('xemgiaBTC', (ctx) =>
+    this.telegramBot.command('giaBTC', (ctx) =>
       this.replyCoinPrice(ctx, 'BTC'),
     );
-    this.telegramBot.command('xemgiaETH', (ctx) =>
+    this.telegramBot.command('giaETH', (ctx) =>
       this.replyCoinPrice(ctx, 'ETH'),
     );
-    this.telegramBot.command('xemgiaDOGE', (ctx) =>
+    this.telegramBot.command('giaDOGE', (ctx) =>
       this.replyCoinPrice(ctx, 'DOGE'),
     );
     this.telegramBot.command('PumpDump', (ctx) =>
@@ -312,7 +314,7 @@ export class BotsService {
     );
   }
 
-  @Cron('* */15 * * * *')
+  // @Cron('* */15 * * * *')
   // Every 15 minute
   async sendSignalBigPriceChange() {
     const prices = await this.binanceService.pricesOf(coinsList);
@@ -384,10 +386,37 @@ export class BotsService {
   }
 
   // @Cron('0 6 */1 * *') //At 06:00 on every day-of-month.
-  @Interval(10 * 1000) //This one to test
-  async dailyReport() {
+  // @Interval(10 * 1000) //This one to test
+  async sendDailyReport() {
     const message = 'Daily report';
     this.logger.debug('Daily report');
-    this.telegramBot.telegram.sendMessage(this.chatGroupID, message);
+    this.telegramBot.telegram.sendMessage(1043619064, message);
+  }
+
+  async builDailyReport() {
+    const dailyInfoData = await this.binanceService.info24hChangeOfCoins('BTC');
+    const result = this.filterReportData(dailyInfoData);
+    return result;
+  }
+
+  filterReportData(data) {
+    return _.filter(data, (currency) => {
+      return this.conditionDailyReport(currency);
+    });
+  }
+
+  conditionDailyReport(data) {
+    const priceChangePercentage = numeral(data['priceChangePercent']).format(
+      '0.00',
+    );
+    const quoteVolume = numeral(data['quoteVolume']).format('0.000000');
+    const lastPrice = numeral(data['lastPrice']).format('0.00000000');
+    return (
+      priceChangePercentage >= -2 &&
+      priceChangePercentage <= 2 &&
+      quoteVolume >= 10 &&
+      lastPrice < 0.00001
+      //Thieu > 6 chu so
+    );
   }
 }
