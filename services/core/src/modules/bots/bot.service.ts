@@ -435,8 +435,8 @@ export class BotsService {
         priceChangePercentage >= -2 &&
         priceChangePercentage <= 2 &&
         quoteVolume >= 10 &&
-        lastPrice < 0.00001
-        //Thieu > 6 chu so
+        lastPrice < 0.00001 &&
+        lastPrice >= 0.000001
       );
     }
   }
