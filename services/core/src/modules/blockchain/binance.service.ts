@@ -8,7 +8,6 @@ const binance = new Binance().options({
 });
 
 const TRADING_CURRENCY = [
-  'BTC',
   'LTC',
   'ETH',
   'NEO',
@@ -519,14 +518,26 @@ export class BinanceService {
       const symbolPairs = this.buildTradingPair(baseSymbol);
 
       const data = await binance.prevDay(false);
-      const symbolMappingData = _(data).groupBy('symbol');
+      const mappingData = this.buildMappingSymbol(data);
 
-      const result = symbolPairs.map((sym) => symbolMappingData[sym][0]);
-      Logger.debug(result);
+      const result = symbolPairs.map((sym) => {
+        if (mappingData[sym]) {
+          return mappingData[sym];
+        }
+      });
+
       return result;
     } catch (err) {
       Logger.error(JSON.stringify(err), null, 'symbolMappingData');
     }
+  }
+
+  buildMappingSymbol(data) {
+    const mapping = {};
+    data.forEach((e) => {
+      mapping[e.symbol] = e;
+    });
+    return mapping;
   }
 
   buildTradingPair(baseSymbol: string): string[] {

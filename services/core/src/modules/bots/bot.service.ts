@@ -386,37 +386,36 @@ export class BotsService {
   }
 
   // @Cron('0 6 */1 * *') //At 06:00 on every day-of-month.
-  // @Interval(10 * 1000) //This one to test
+  @Interval(10 * 1000) //This one to test
   async sendDailyReport() {
     const message = 'Daily report';
     this.logger.debug('Daily report');
-    this.telegramBot.telegram.sendMessage(1043619064, message);
+    this.telegramBot.telegram.sendMessage(-587298976, message);
   }
 
   async builDailyReport() {
     const dailyInfoData = await this.binanceService.info24hChangeOfCoins('BTC');
-    const result = this.filterReportData(dailyInfoData);
+    const result = dailyInfoData.filter((data) =>
+      this.conditionDailyReport(data),
+    );
+
     return result;
   }
 
-  filterReportData(data) {
-    return _.filter(data, (currency) => {
-      return this.conditionDailyReport(currency);
-    });
-  }
-
   conditionDailyReport(data) {
-    const priceChangePercentage = numeral(data['priceChangePercent']).format(
-      '0.00',
-    );
-    const quoteVolume = numeral(data['quoteVolume']).format('0.000000');
-    const lastPrice = numeral(data['lastPrice']).format('0.00000000');
-    return (
-      priceChangePercentage >= -2 &&
-      priceChangePercentage <= 2 &&
-      quoteVolume >= 10 &&
-      lastPrice < 0.00001
-      //Thieu > 6 chu so
-    );
+    if (data) {
+      const priceChangePercentage = numeral(data['priceChangePercent']).format(
+        '0.00',
+      );
+      const quoteVolume = numeral(data['quoteVolume']).format('0.000000');
+      const lastPrice = numeral(data['lastPrice']).format('0.00000000');
+      return (
+        priceChangePercentage >= -2 &&
+        priceChangePercentage <= 2 &&
+        quoteVolume >= 10 &&
+        lastPrice < 0.00001
+        //Thieu > 6 chu so
+      );
+    }
   }
 }
