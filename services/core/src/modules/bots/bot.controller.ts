@@ -12,7 +12,7 @@ export class BotController {
 
   @Get('/daily')
   async getPriceTest(): Promise<any> {
-    const result = await this.botService.builDailyReport();
+    const result = await this.botService.getDailyReportContent();
     return { items: result };
   }
 }

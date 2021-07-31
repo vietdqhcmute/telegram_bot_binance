@@ -245,6 +245,8 @@ export class BotsService {
       this.applyEventListner(ctx, 'SHAKR_PUMP_DUMP'),
     );
 
+    this.telegramBot.command('24hreport', (ctx) => this.sendDailyReport());
+
     this.telegramBot.launch();
   }
 
@@ -385,15 +387,35 @@ export class BotsService {
       .then((rs) => this.holderSerivce.syncHolderData(rs));
   }
 
-  // @Cron('0 6 */1 * *') //At 06:00 on every day-of-month.
-  @Interval(10 * 1000) //This one to test
+  @Cron('0 6 */1 * *') //At 06:00 on every day-of-month.
+  // @Interval(10 * 1000) //This one to test
   async sendDailyReport() {
-    const message = 'Daily report';
     this.logger.debug('Daily report');
+    const reportingData = await this.getDailyReportContent();
+    const message = this.dailyReportContent(reportingData);
     this.telegramBot.telegram.sendMessage(-587298976, message);
   }
 
-  async builDailyReport() {
+  dailyReportContent(reportingData) {
+    const sentences = reportingData.map(
+      (sym) => `
+    ${sym.symbol}
+    Last price: ${sym.lastPrice}
+    24h volume: ${sym.quoteVolume}
+    24h change: ${sym.priceChangePercent}
+
+    `,
+    );
+
+    const content = `
+    This is daily report:
+      ${sentences}
+    `;
+
+    return content;
+  }
+
+  async getDailyReportContent() {
     const dailyInfoData = await this.binanceService.info24hChangeOfCoins('BTC');
     const result = dailyInfoData.filter((data) =>
       this.conditionDailyReport(data),
